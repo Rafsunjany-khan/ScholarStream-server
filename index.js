@@ -12,6 +12,10 @@ app.use(express.json());
 const userRoutes = require("./routes/users");
 app.use("/api/users", userRoutes);
 
+// Scholarships routes
+const scholarshipRoutes = require("./routes/scholarships");
+app.use("/api/scholarships", scholarshipRoutes);
+
 app.get("/", (req, res) => res.send("Server is running"));
 
 const client = new MongoClient(process.env.MONGO_URI, {
