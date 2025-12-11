@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
+const { ObjectId } = require("mongodb");
 
-
+//Get all scholarships
 router.get("/", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -19,7 +20,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Get all unique scholarship categories
+//Get all unique categories
 router.get("/categories", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -30,11 +31,9 @@ router.get("/categories", async (req, res) => {
       { $sort: { _id: 1 } }
     ]).toArray();
 
-    const categoryList = categories.map(c => c._id);
-
     res.status(200).json({
       message: "Unique scholarship categories fetched successfully",
-      data: categoryList,
+      data: categories.map(c => c._id),
     });
   } catch (error) {
     console.error("Error fetching scholarship categories:", error);
@@ -42,7 +41,7 @@ router.get("/categories", async (req, res) => {
   }
 });
 
-// Get all unique subject categories
+//Get all unique subject categories
 router.get("/subjects", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -53,11 +52,9 @@ router.get("/subjects", async (req, res) => {
       { $sort: { _id: 1 } }
     ]).toArray();
 
-    const subjectList = subjects.map(s => s._id);
-
     res.status(200).json({
       message: "Unique subject categories fetched successfully",
-      data: subjectList,
+      data: subjects.map(s => s._id),
     });
   } catch (error) {
     console.error("Error fetching subject categories:", error);
@@ -65,8 +62,7 @@ router.get("/subjects", async (req, res) => {
   }
 });
 
-
-// Get all uniques countries
+//Get all unique countries
 router.get("/countries", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -77,14 +73,40 @@ router.get("/countries", async (req, res) => {
       { $sort: { _id: 1 } }
     ]).toArray();
 
-    const countryList = countries.map(c => c._id);
-
     res.status(200).json({
       message: "Unique countries fetched successfully",
-      data: countryList,
+      data: countries.map(c => c._id),
     });
   } catch (error) {
     console.error("Error fetching countries:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+//Get one scholarship by ID
+router.get("/:id", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const scholarships = db.collection("scholarships");
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid scholarship ID" });
+    }
+
+    const scholarship = await scholarships.findOne({ _id: new ObjectId(id) });
+
+    if (!scholarship) {
+      return res.status(404).json({ message: "Scholarship not found" });
+    }
+
+    res.status(200).json({
+      message: "Scholarship fetched successfully",
+      data: scholarship,
+    });
+  } catch (error) {
+    console.error("Error fetching scholarship:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
