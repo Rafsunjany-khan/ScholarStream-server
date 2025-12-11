@@ -42,6 +42,29 @@ router.get("/categories", async (req, res) => {
   }
 });
 
+// Get all unique subject categories
+router.get("/subjects", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const scholarships = db.collection("scholarships");
+
+    const subjects = await scholarships.aggregate([
+      { $group: { _id: "$subjectCategory" } },
+      { $sort: { _id: 1 } }
+    ]).toArray();
+
+    const subjectList = subjects.map(s => s._id);
+
+    res.status(200).json({
+      message: "Unique subject categories fetched successfully",
+      data: subjectList,
+    });
+  } catch (error) {
+    console.error("Error fetching subject categories:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 
 // Get all uniques countries
 router.get("/countries", async (req, res) => {
