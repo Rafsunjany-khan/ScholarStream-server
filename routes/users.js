@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
+//Register
 router.post("/register", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -61,6 +62,45 @@ router.post("/login", async (req, res) => {
       message: "User fetched successfully",
       user,
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+//Get all users
+router.get("/", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const users = db.collection("users");
+
+    const allUsers = await users.find({}).toArray();
+    res.status(200).json({ users: allUsers });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+//user to Admin
+router.put("/make-admin/:uid", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const users = db.collection("users");
+
+    const { uid } = req.params;
+
+    const existingAdmin = await users.findOne({ role: "Admin" });
+    if (existingAdmin) {
+      return res.status(400).json({ message: "Admin already exists" });
+    }
+
+    const result = await users.updateOne({ uid }, { $set: { role: "Admin" } });
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User promoted to Admin successfully" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
