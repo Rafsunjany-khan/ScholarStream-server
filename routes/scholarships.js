@@ -63,6 +63,33 @@ router.post("/", async (req, res) => {
   }
 });
 
+//Update scholarship
+router.put("/:id", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const scholarships = db.collection("scholarships");
+    const { id } = req.params;
+    const updateData = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid scholarship ID" });
+    }
+
+    const result = await scholarships.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "Scholarship not found or data unchanged" });
+    }
+
+    res.status(200).json({ message: "Scholarship updated successfully" });
+  } catch (error) {
+    console.error("Error updating scholarship:", error);
+    res.status(500).json({ message: "Failed to update scholarship" });
+  }
+});
 
 //Get all scholarships
 router.get("/", async (req, res) => {
