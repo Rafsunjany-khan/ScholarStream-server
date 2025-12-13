@@ -2,6 +2,68 @@ const express = require("express");
 const router = express.Router();
 const { ObjectId } = require("mongodb");
 
+
+//Add new scholarship
+router.post("/", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const scholarships = db.collection("scholarships");
+
+    const {
+      scholarshipName,
+      universityName,
+      universityImage,
+      universityCountry,
+      universityCity,
+      universityWorldRank,
+      subjectCategory,
+      scholarshipCategory,
+      degree,
+      tuitionFees,
+      applicationFees,
+      serviceCharge,
+      applicationDeadline,
+      scholarshipPostDate,
+      postedUserEmail,
+    } = req.body;
+
+    // Required fields
+    if (!scholarshipName || !universityName || !universityCountry || !universityCity || !subjectCategory || !scholarshipCategory || !degree || !applicationFees || !serviceCharge || !applicationDeadline || !postedUserEmail) {
+      return res.status(400).json({ message: "Please fill all required fields" });
+    }
+
+    const newScholarship = {
+      scholarshipName,
+      universityName,
+      universityImage: universityImage || "",
+      universityCountry,
+      universityCity,
+      universityWorldRank: universityWorldRank ? Number(universityWorldRank) : null,
+      subjectCategory,
+      scholarshipCategory,
+      degree,
+      tuitionFees: tuitionFees ? Number(tuitionFees) : 0,
+      applicationFees: Number(applicationFees),
+      serviceCharge: Number(serviceCharge),
+      applicationDeadline,
+      scholarshipPostDate: scholarshipPostDate || new Date().toISOString().split("T")[0],
+      postedUserEmail,
+      createdAt: new Date(),
+    };
+
+    const result = await scholarships.insertOne(newScholarship);
+
+    res.status(201).json({
+      message: "Scholarship added successfully",
+      data: { ...newScholarship, _id: result.insertedId },
+    });
+  } catch (error) {
+    console.error("Error adding scholarship:", error);
+    res.status(500).json({ message: "Failed to add scholarship" });
+  }
+});
+
+
 //Get all scholarships
 router.get("/", async (req, res) => {
   try {
