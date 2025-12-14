@@ -95,4 +95,41 @@ router.put("/update-role/:uid", verifyAdmin, async (req, res) => {
   }
 });
 
+// Delete user
+router.delete("/:uid", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const users = db.collection("users");
+
+    const { uid } = req.params;
+    const { adminUid } = req.query;
+
+    if (!adminUid) {
+      return res.status(401).json({ message: "Admin UID required" });
+    }
+
+    const adminUser = await users.findOne({ uid: adminUid });
+    if (!adminUser || adminUser.role !== "Admin") {
+      return res.status(403).json({ message: "Access denied. Admin only." });
+    }
+
+    // Prevent admin deleting himself
+    if (uid === adminUid) {
+      return res.status(400).json({ message: "Admin cannot delete self" });
+    }
+
+    const result = await users.deleteOne({ uid });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 module.exports = router;
