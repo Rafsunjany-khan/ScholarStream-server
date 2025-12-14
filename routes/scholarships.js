@@ -91,6 +91,31 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+// Delete scholarship
+router.delete("/:id", async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const scholarships = db.collection("scholarships");
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid scholarship ID" });
+    }
+
+    const result = await scholarships.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "Scholarship not found" });
+    }
+
+    res.status(200).json({ message: "Scholarship deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting scholarship:", error);
+    res.status(500).json({ message: "Failed to delete scholarship" });
+  }
+});
+
+
 //Get all scholarships
 router.get("/", async (req, res) => {
   try {
