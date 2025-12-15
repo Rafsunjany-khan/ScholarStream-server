@@ -97,5 +97,30 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+// Delete an application
+router.delete("/:id", async (req, res) => {
+  const db = req.app.locals.db;
+  const applications = db.collection("applications");
+  const applicationId = req.params.id;
+
+  try {
+    const existingApp = await applications.findOne({ _id: new ObjectId(applicationId) });
+
+    if (!existingApp) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    if (existingApp.applicationStatus !== "pending") {
+      return res.status(403).json({ message: "Cannot delete an application that is not pending" });
+    }
+
+    await applications.deleteOne({ _id: new ObjectId(applicationId) });
+    res.json({ message: "Application deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to delete application" });
+  }
+});
+
 
 module.exports = router;
