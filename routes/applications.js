@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { ObjectId } = require("mongodb");
 
 // Save a new application
 router.post("/", async (req, res) => {
@@ -8,7 +9,7 @@ router.post("/", async (req, res) => {
 
   try {
     const newApplication = {
-      scholarshipId: req.body.scholarshipId,
+      scholarshipId: new ObjectId(req.body.scholarshipId),
       userId: req.body.userId,
       userName: req.body.userName,
       userEmail: req.body.userEmail,
@@ -35,22 +36,32 @@ router.post("/", async (req, res) => {
   }
 });
 
-// get data
+// Get all applications
 router.get("/user/:email", async (req, res) => {
   const db = req.app.locals.db;
   const applications = db.collection("applications");
 
   try {
     const data = await applications
-      .find({ userEmail: req.params.email })
+      .aggregate([
+        { $match: { userEmail: req.params.email } },
+        {
+          $lookup: {
+            from: "scholarships",
+            localField: "scholarshipId",
+            foreignField: "_id",
+            as: "scholarshipDetails",
+          },
+        },
+        { $unwind: { path: "$scholarshipDetails", preserveNullAndEmptyArrays: true } },
+      ])
       .toArray();
 
     res.json(data);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Failed to fetch applications" });
   }
 });
-
-
 
 module.exports = router;
