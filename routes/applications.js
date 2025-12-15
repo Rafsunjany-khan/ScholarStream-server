@@ -24,11 +24,33 @@ router.post("/", async (req, res) => {
     };
 
     const result = await applications.insertOne(newApplication);
-    res.status(201).json({ message: "Application saved", application: result });
+
+    res.status(201).json({
+      message: "Application saved successfully",
+      application: result,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to save application" });
   }
 });
+
+// get data
+router.get("/user/:email", async (req, res) => {
+  const db = req.app.locals.db;
+  const applications = db.collection("applications");
+
+  try {
+    const data = await applications
+      .find({ userEmail: req.params.email })
+      .toArray();
+
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch applications" });
+  }
+});
+
+
 
 module.exports = router;
