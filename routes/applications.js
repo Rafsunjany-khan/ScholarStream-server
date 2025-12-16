@@ -170,4 +170,31 @@ router.patch("/:id/feedback", async (req, res) => {
 });
 
 
+// Update application status
+router.patch("/:id/status", async (req, res) => {
+  const db = req.app.locals.db;
+  const applications = db.collection("applications");
+
+  const { id } = req.params;
+  const { status } = req.body;
+
+  const allowedStatus = ["processing", "completed"];
+
+  if (!allowedStatus.includes(status)) {
+    return res.status(400).json({ message: "Invalid status value" });
+  }
+
+  try {
+    await applications.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { applicationStatus: status } }
+    );
+
+    res.json({ message: "Application status updated successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to update application status" });
+  }
+});
+
 module.exports = router;
