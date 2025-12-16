@@ -122,5 +122,32 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// Get all applications (for moderators)
+router.get("/", async (req, res) => {
+  const db = req.app.locals.db;
+  const applications = db.collection("applications");
+
+  try {
+    const data = await applications
+      .aggregate([
+        {
+          $lookup: {
+            from: "scholarships",
+            localField: "scholarshipId",
+            foreignField: "_id",
+            as: "scholarshipDetails",
+          },
+        },
+        { $unwind: { path: "$scholarshipDetails", preserveNullAndEmptyArrays: true } },
+      ])
+      .toArray();
+
+    res.json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch applications" });
+  }
+});
+
 
 module.exports = router;
