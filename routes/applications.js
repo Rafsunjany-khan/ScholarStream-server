@@ -149,5 +149,25 @@ router.get("/", async (req, res) => {
   }
 });
 
+//Feedback
+router.patch("/:id/feedback", async (req, res) => {
+  const db = req.app.locals.db;
+  const applications = db.collection("applications");
+
+  const { id } = req.params;
+  const { feedback } = req.body;
+
+  try {
+    await applications.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { feedback } }
+    );
+
+    res.json({ message: "Feedback updated successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update feedback" });
+  }
+});
+
 
 module.exports = router;
