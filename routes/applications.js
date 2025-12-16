@@ -170,7 +170,7 @@ router.patch("/:id/feedback", async (req, res) => {
 });
 
 
-// Update application status
+// Update and rejection application status
 router.patch("/:id/status", async (req, res) => {
   const db = req.app.locals.db;
   const applications = db.collection("applications");
@@ -178,7 +178,7 @@ router.patch("/:id/status", async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
-  const allowedStatus = ["processing", "completed"];
+  const allowedStatus = ["processing", "completed", "rejected"];
 
   if (!allowedStatus.includes(status)) {
     return res.status(400).json({ message: "Invalid status value" });
@@ -190,7 +190,7 @@ router.patch("/:id/status", async (req, res) => {
       { $set: { applicationStatus: status } }
     );
 
-    res.json({ message: "Application status updated successfully" });
+    res.json({ message: `Application status updated to ${status} successfully` });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to update application status" });
