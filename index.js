@@ -20,6 +20,9 @@ app.use("/api/scholarships", scholarshipRoutes);
 const applicationsRoute = require("./routes/applications");
 app.use("/api/applications", applicationsRoute);
 
+//Payment
+const paymentRoutes = require("./routes/payment");
+app.use("/api/payment", paymentRoutes);
 
 app.get("/", (req, res) => res.send("Server is running"));
 

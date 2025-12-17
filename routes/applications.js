@@ -8,27 +8,71 @@ router.post("/", async (req, res) => {
   const applications = db.collection("applications");
 
   try {
+    const {
+      scholarshipId,
+      userId,
+      userName,
+      userEmail,
+      universityName,
+      scholarshipCategory,
+      degree,
+      applicationFees,
+      serviceCharge,
+      paymentStatus = "unpaid",
+    } = req.body;
+
+    // Check if the user already applied for this scholarship
+    const existingApp = await applications.findOne({
+      scholarshipId: new ObjectId(scholarshipId),
+      userId,
+    });
+
+    if (existingApp) {
+      if (paymentStatus === "paid" && existingApp.paymentStatus === "unpaid") {
+        await applications.updateOne(
+          { _id: existingApp._id },
+          {
+            $set: {
+              paymentStatus: "paid",
+              applicationDate: new Date().toISOString().split("T")[0],
+            },
+          }
+        );
+        const updatedApp = await applications.findOne({ _id: existingApp._id });
+        return res.status(200).json({
+          message: "Payment updated successfully",
+          application: updatedApp,
+        });
+      }
+
+      return res.status(400).json({
+        message: "You have already applied for this scholarship",
+        application: existingApp,
+      });
+    }
+
     const newApplication = {
-      scholarshipId: new ObjectId(req.body.scholarshipId), // convert to ObjectId
-      userId: req.body.userId,
-      userName: req.body.userName,
-      userEmail: req.body.userEmail,
-      universityName: req.body.universityName,
-      scholarshipCategory: req.body.scholarshipCategory,
-      degree: req.body.degree,
-      applicationFees: req.body.applicationFees,
-      serviceCharge: req.body.serviceCharge,
+      scholarshipId: new ObjectId(scholarshipId),
+      userId,
+      userName,
+      userEmail,
+      universityName,
+      scholarshipCategory,
+      degree,
+      applicationFees,
+      serviceCharge,
       applicationStatus: "pending",
-      paymentStatus: "unpaid",
+      paymentStatus,
       applicationDate: new Date().toISOString().split("T")[0],
       feedback: "",
     };
 
     const result = await applications.insertOne(newApplication);
+    const insertedApplication = await applications.findOne({ _id: result.insertedId });
 
     res.status(201).json({
       message: "Application saved successfully",
-      application: result,
+      application: insertedApplication,
     });
   } catch (error) {
     console.error(error);
@@ -64,7 +108,7 @@ router.get("/user/:email", async (req, res) => {
   }
 });
 
-// Edit application (only if status is pending)
+// Edit application
 router.put("/:id", async (req, res) => {
   const db = req.app.locals.db;
   const applications = db.collection("applications");
@@ -77,20 +121,36 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ message: "Application not found" });
     }
 
-    if (existingApp.applicationStatus !== "pending") {
-      return res.status(403).json({ message: "Cannot edit an application that is not pending" });
+    const updatedFields = {};
+
+    if (existingApp.applicationStatus === "pending") {
+      if (req.body.degree) updatedFields.degree = req.body.degree;
+      if (req.body.scholarshipCategory) updatedFields.scholarshipCategory = req.body.scholarshipCategory;
     }
 
-    const updatedFields = {};
-    if (req.body.degree) updatedFields.degree = req.body.degree;
-    if (req.body.scholarshipCategory) updatedFields.scholarshipCategory = req.body.scholarshipCategory;
+    if (req.body.paymentStatus) {
+      const allowedPaymentStatus = ["unpaid", "paid"];
+      if (!allowedPaymentStatus.includes(req.body.paymentStatus)) {
+        return res.status(400).json({ message: "Invalid paymentStatus value" });
+      }
+      updatedFields.paymentStatus = req.body.paymentStatus;
 
-    const result = await applications.updateOne(
+      if (req.body.paymentStatus === "paid") {
+        updatedFields.applicationDate = new Date().toISOString().split("T")[0];
+      }
+    }
+
+    if (Object.keys(updatedFields).length === 0) {
+      return res.status(400).json({ message: "No valid fields to update" });
+    }
+
+    await applications.updateOne(
       { _id: new ObjectId(applicationId) },
       { $set: updatedFields }
     );
 
-    res.json({ message: "Application updated successfully", result });
+    const updatedApp = await applications.findOne({ _id: new ObjectId(applicationId) });
+    res.json({ message: "Application updated successfully", application: updatedApp });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to update application" });
@@ -149,7 +209,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-//Feedback
+// Feedback
 router.patch("/:id/feedback", async (req, res) => {
   const db = req.app.locals.db;
   const applications = db.collection("applications");
@@ -168,7 +228,6 @@ router.patch("/:id/feedback", async (req, res) => {
     res.status(500).json({ message: "Failed to update feedback" });
   }
 });
-
 
 // Update and rejection application status
 router.patch("/:id/status", async (req, res) => {
