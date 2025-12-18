@@ -24,6 +24,10 @@ app.use("/api/applications", applicationsRoute);
 const paymentRoutes = require("./routes/payment");
 app.use("/api/payment", paymentRoutes);
 
+//Review
+const reviewRoutes = require("./routes/review");
+app.use("/api/reviews", reviewRoutes);
+
 app.get("/", (req, res) => res.send("Server is running"));
 
 const client = new MongoClient(process.env.MONGO_URI, {
