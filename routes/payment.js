@@ -2,9 +2,14 @@ const express = require("express");
 const router = express.Router();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { ObjectId } = require("mongodb");
+const verifyToken = require("../middleware/verifyToken");
 
 // Create Stripe Payment
-router.post("/create-payment-intent", async (req, res) => {
+router.post("/create-payment-intent", verifyToken, async (req, res) => {
+  if (req.user.role !== "Student") {
+    return res.status(403).json({ message: "Only students can make payments" });
+  }
+
   try {
     const { amount } = req.body;
 
@@ -26,7 +31,7 @@ router.post("/create-payment-intent", async (req, res) => {
 });
 
 // Confirm payment
-router.post("/confirm-payment", async (req, res) => {
+router.post("/confirm-payment", verifyToken, async (req, res) => {
   const db = req.app.locals.db;
   const applications = db.collection("applications");
 
@@ -37,25 +42,27 @@ router.post("/confirm-payment", async (req, res) => {
       return res.status(400).json({ message: "Invalid request" });
     }
 
+    if (!ObjectId.isValid(applicationId)) {
+      return res.status(400).json({ message: "Invalid application ID" });
+    }
+
     const existingApp = await applications.findOne({ _id: new ObjectId(applicationId) });
 
     if (!existingApp) {
       return res.status(404).json({ message: "Application not found" });
     }
 
-    const updateData = {
-      paymentStatus,
-    };
+    if (req.user.role === "Student" && existingApp.userId !== req.user.uid) {
+      return res.status(403).json({ message: "Students can only confirm their own payments" });
+    }
 
-    // Update applicationDate if payment is successful
+    const updateData = { paymentStatus };
+
     if (paymentStatus === "paid") {
       updateData.applicationDate = new Date().toISOString().split("T")[0];
     }
 
-    await applications.updateOne(
-      { _id: new ObjectId(applicationId) },
-      { $set: updateData }
-    );
+    await applications.updateOne({ _id: new ObjectId(applicationId) }, { $set: updateData });
 
     const updatedApp = await applications.findOne({ _id: new ObjectId(applicationId) });
 

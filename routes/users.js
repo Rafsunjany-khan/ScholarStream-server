@@ -1,23 +1,19 @@
 const express = require("express");
 const router = express.Router();
+const jwt = require("jsonwebtoken");
+const verifyToken = require("../middleware/verifyToken");
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Admin verification middleware
-const verifyAdmin = async (req, res, next) => {
-  try {
-    const db = req.app.locals.db;
-    const users = db.collection("users");
-    const { adminUid } = req.body;
+const verifyAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-    if (!adminUid) return res.status(401).json({ message: "Admin UID required" });
-
-    const adminUser = await users.findOne({ uid: adminUid });
-    if (!adminUser || adminUser.role !== "Admin") return res.status(403).json({ message: "Access denied. Admin only." });
-
-    next();
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+  if (req.user.role !== "Admin") {
+    return res.status(403).json({ message: "Access denied. Admin only." });
   }
+
+  next();
 };
 
 // Register user
@@ -42,7 +38,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// Login user
+// Login user and return JWT
 router.post("/login", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -54,7 +50,13 @@ router.post("/login", async (req, res) => {
     const user = uid ? await users.findOne({ uid }) : await users.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.status(200).json({ message: "User fetched successfully", user });
+    const token = jwt.sign(
+      { uid: user.uid, email: user.email, name: user.name, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.status(200).json({ message: "User logged in successfully", user, token });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -62,7 +64,7 @@ router.post("/login", async (req, res) => {
 });
 
 // Get all users
-router.get("/", async (req, res) => {
+router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const db = req.app.locals.db;
     const users = db.collection("users");
@@ -75,7 +77,7 @@ router.get("/", async (req, res) => {
 });
 
 // Update user role
-router.put("/update-role/:uid", verifyAdmin, async (req, res) => {
+router.put("/update-role/:uid", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const db = req.app.locals.db;
     const users = db.collection("users");
@@ -96,33 +98,18 @@ router.put("/update-role/:uid", verifyAdmin, async (req, res) => {
 });
 
 // Delete user
-router.delete("/:uid", async (req, res) => {
+router.delete("/:uid", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const db = req.app.locals.db;
     const users = db.collection("users");
 
     const { uid } = req.params;
-    const { adminUid } = req.query;
 
-    if (!adminUid) {
-      return res.status(401).json({ message: "Admin UID required" });
-    }
-
-    const adminUser = await users.findOne({ uid: adminUid });
-    if (!adminUser || adminUser.role !== "Admin") {
-      return res.status(403).json({ message: "Access denied. Admin only." });
-    }
-
-    // Prevent admin deleting himself
-    if (uid === adminUid) {
-      return res.status(400).json({ message: "Admin cannot delete self" });
-    }
+    if (uid === req.user.uid) return res.status(400).json({ message: "Admin cannot delete self" });
 
     const result = await users.deleteOne({ uid });
 
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (result.deletedCount === 0) return res.status(404).json({ message: "User not found" });
 
     res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
@@ -130,6 +117,5 @@ router.delete("/:uid", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
 
 module.exports = router;

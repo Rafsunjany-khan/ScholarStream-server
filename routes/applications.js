@@ -1,9 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const { ObjectId } = require("mongodb");
+const verifyToken = require("../middleware/verifyToken");
 
 // Save a new application
-router.post("/", async (req, res) => {
+router.post("/", verifyToken, async (req, res) => {
+  if (req.user.role !== "Student") {
+    return res.status(403).json({ message: "Only students can apply" });
+  }
+
   const db = req.app.locals.db;
   const applications = db.collection("applications");
 
@@ -21,7 +26,10 @@ router.post("/", async (req, res) => {
       paymentStatus = "unpaid",
     } = req.body;
 
-    // Check if the user already applied for this scholarship
+    if (!scholarshipId || !userId || !userEmail) {
+      return res.status(400).json({ message: "Required fields missing" });
+    }
+
     const existingApp = await applications.findOne({
       scholarshipId: new ObjectId(scholarshipId),
       userId,
@@ -34,7 +42,7 @@ router.post("/", async (req, res) => {
           {
             $set: {
               paymentStatus: "paid",
-              applicationDate: new Date().toISOString().split("T")[0],
+              applicationDate: new Date(),
             },
           }
         );
@@ -63,7 +71,7 @@ router.post("/", async (req, res) => {
       serviceCharge,
       applicationStatus: "pending",
       paymentStatus,
-      applicationDate: new Date().toISOString().split("T")[0],
+      applicationDate: new Date(),
       feedback: "",
     };
 
@@ -80,8 +88,12 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Get all applications
-router.get("/user/:email", async (req, res) => {
+// Get all applications for a user
+router.get("/user/:email", verifyToken, async (req, res) => {
+  if (req.user.email !== req.params.email && !["Admin", "Moderator"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
   const db = req.app.locals.db;
   const applications = db.collection("applications");
 
@@ -109,16 +121,22 @@ router.get("/user/:email", async (req, res) => {
 });
 
 // Edit application
-router.put("/:id", async (req, res) => {
+router.put("/:id", verifyToken, async (req, res) => {
   const db = req.app.locals.db;
   const applications = db.collection("applications");
   const applicationId = req.params.id;
 
+  if (!ObjectId.isValid(applicationId)) {
+    return res.status(400).json({ message: "Invalid application ID" });
+  }
+
   try {
     const existingApp = await applications.findOne({ _id: new ObjectId(applicationId) });
 
-    if (!existingApp) {
-      return res.status(404).json({ message: "Application not found" });
+    if (!existingApp) return res.status(404).json({ message: "Application not found" });
+
+    if (existingApp.userId !== req.user.uid && !["Admin", "Moderator"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Access denied" });
     }
 
     const updatedFields = {};
@@ -136,7 +154,7 @@ router.put("/:id", async (req, res) => {
       updatedFields.paymentStatus = req.body.paymentStatus;
 
       if (req.body.paymentStatus === "paid") {
-        updatedFields.applicationDate = new Date().toISOString().split("T")[0];
+        updatedFields.applicationDate = new Date();
       }
     }
 
@@ -144,10 +162,7 @@ router.put("/:id", async (req, res) => {
       return res.status(400).json({ message: "No valid fields to update" });
     }
 
-    await applications.updateOne(
-      { _id: new ObjectId(applicationId) },
-      { $set: updatedFields }
-    );
+    await applications.updateOne({ _id: new ObjectId(applicationId) }, { $set: updatedFields });
 
     const updatedApp = await applications.findOne({ _id: new ObjectId(applicationId) });
     res.json({ message: "Application updated successfully", application: updatedApp });
@@ -158,20 +173,26 @@ router.put("/:id", async (req, res) => {
 });
 
 // Delete an application
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", verifyToken, async (req, res) => {
   const db = req.app.locals.db;
   const applications = db.collection("applications");
   const applicationId = req.params.id;
 
+  if (!ObjectId.isValid(applicationId)) {
+    return res.status(400).json({ message: "Invalid application ID" });
+  }
+
   try {
     const existingApp = await applications.findOne({ _id: new ObjectId(applicationId) });
 
-    if (!existingApp) {
-      return res.status(404).json({ message: "Application not found" });
-    }
+    if (!existingApp) return res.status(404).json({ message: "Application not found" });
 
     if (existingApp.applicationStatus !== "pending") {
       return res.status(403).json({ message: "Cannot delete an application that is not pending" });
+    }
+
+    if (existingApp.userId !== req.user.uid && !["Admin", "Moderator"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Access denied" });
     }
 
     await applications.deleteOne({ _id: new ObjectId(applicationId) });
@@ -182,8 +203,12 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// Get all applications (for moderators)
-router.get("/", async (req, res) => {
+// Get all applications
+router.get("/", verifyToken, async (req, res) => {
+  if (!["Admin", "Moderator"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
   const db = req.app.locals.db;
   const applications = db.collection("applications");
 
@@ -209,33 +234,41 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Feedback
-router.patch("/:id/feedback", async (req, res) => {
+// Feedback update
+router.patch("/:id/feedback", verifyToken, async (req, res) => {
+  if (!["Admin", "Moderator"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
   const db = req.app.locals.db;
   const applications = db.collection("applications");
 
   const { id } = req.params;
   const { feedback } = req.body;
 
-  try {
-    await applications.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { feedback } }
-    );
+  if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid application ID" });
 
+  try {
+    await applications.updateOne({ _id: new ObjectId(id) }, { $set: { feedback } });
     res.json({ message: "Feedback updated successfully" });
   } catch (error) {
     res.status(500).json({ message: "Failed to update feedback" });
   }
 });
 
-// Update and rejection application status
-router.patch("/:id/status", async (req, res) => {
+// Update application status
+router.patch("/:id/status", verifyToken, async (req, res) => {
+  if (!["Admin", "Moderator"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
   const db = req.app.locals.db;
   const applications = db.collection("applications");
 
   const { id } = req.params;
   const { status } = req.body;
+
+  if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid application ID" });
 
   const allowedStatus = ["processing", "completed", "rejected"];
 

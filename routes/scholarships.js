@@ -1,10 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const { ObjectId } = require("mongodb");
+const verifyToken = require("../middleware/verifyToken");
 
+// Add new scholarship
+router.post("/", verifyToken, async (req, res) => {
+  if (!["Admin", "Moderator"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Access denied" });
+  }
 
-//Add new scholarship
-router.post("/", async (req, res) => {
   try {
     const db = req.app.locals.db;
     const scholarships = db.collection("scholarships");
@@ -27,7 +31,6 @@ router.post("/", async (req, res) => {
       postedUserEmail,
     } = req.body;
 
-    // Required fields
     if (!scholarshipName || !universityName || !universityCountry || !universityCity || !subjectCategory || !scholarshipCategory || !degree || !applicationFees || !serviceCharge || !applicationDeadline || !postedUserEmail) {
       return res.status(400).json({ message: "Please fill all required fields" });
     }
@@ -63,8 +66,12 @@ router.post("/", async (req, res) => {
   }
 });
 
-//Update scholarship
-router.put("/:id", async (req, res) => {
+// Update scholarship
+router.put("/:id", verifyToken, async (req, res) => {
+  if (!["Admin", "Moderator"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
   try {
     const db = req.app.locals.db;
     const scholarships = db.collection("scholarships");
@@ -75,10 +82,7 @@ router.put("/:id", async (req, res) => {
       return res.status(400).json({ message: "Invalid scholarship ID" });
     }
 
-    const result = await scholarships.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: updateData }
-    );
+    const result = await scholarships.updateOne({ _id: new ObjectId(id) }, { $set: updateData });
 
     if (result.modifiedCount === 0) {
       return res.status(404).json({ message: "Scholarship not found or data unchanged" });
@@ -92,7 +96,11 @@ router.put("/:id", async (req, res) => {
 });
 
 // Delete scholarship
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", verifyToken, async (req, res) => {
+  if (!["Admin", "Moderator"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Access denied" });
+  }
+
   try {
     const db = req.app.locals.db;
     const scholarships = db.collection("scholarships");
@@ -115,13 +123,11 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-
-//Get all scholarships
+// Get all scholarships
 router.get("/", async (req, res) => {
   try {
     const db = req.app.locals.db;
     const scholarships = db.collection("scholarships");
-
     const allScholarships = await scholarships.find({}).toArray();
 
     res.status(200).json({
@@ -134,16 +140,13 @@ router.get("/", async (req, res) => {
   }
 });
 
-//Get all unique categories
+// Get unique categories
 router.get("/categories", async (req, res) => {
   try {
     const db = req.app.locals.db;
     const scholarships = db.collection("scholarships");
 
-    const categories = await scholarships.aggregate([
-      { $group: { _id: "$scholarshipCategory" } },
-      { $sort: { _id: 1 } }
-    ]).toArray();
+    const categories = await scholarships.aggregate([{ $group: { _id: "$scholarshipCategory" } }, { $sort: { _id: 1 } }]).toArray();
 
     res.status(200).json({
       message: "Unique scholarship categories fetched successfully",
@@ -155,16 +158,13 @@ router.get("/categories", async (req, res) => {
   }
 });
 
-//Get all unique subject categories
+// Get unique subject categories
 router.get("/subjects", async (req, res) => {
   try {
     const db = req.app.locals.db;
     const scholarships = db.collection("scholarships");
 
-    const subjects = await scholarships.aggregate([
-      { $group: { _id: "$subjectCategory" } },
-      { $sort: { _id: 1 } }
-    ]).toArray();
+    const subjects = await scholarships.aggregate([{ $group: { _id: "$subjectCategory" } }, { $sort: { _id: 1 } }]).toArray();
 
     res.status(200).json({
       message: "Unique subject categories fetched successfully",
@@ -176,16 +176,13 @@ router.get("/subjects", async (req, res) => {
   }
 });
 
-//Get all unique countries
+// Get unique countries
 router.get("/countries", async (req, res) => {
   try {
     const db = req.app.locals.db;
     const scholarships = db.collection("scholarships");
 
-    const countries = await scholarships.aggregate([
-      { $group: { _id: "$universityCountry" } },
-      { $sort: { _id: 1 } }
-    ]).toArray();
+    const countries = await scholarships.aggregate([{ $group: { _id: "$universityCountry" } }, { $sort: { _id: 1 } }]).toArray();
 
     res.status(200).json({
       message: "Unique countries fetched successfully",
@@ -197,8 +194,7 @@ router.get("/countries", async (req, res) => {
   }
 });
 
-
-//Get one scholarship by ID
+// Get one scholarship by ID
 router.get("/:id", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -215,10 +211,7 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ message: "Scholarship not found" });
     }
 
-    res.status(200).json({
-      message: "Scholarship fetched successfully",
-      data: scholarship,
-    });
+    res.status(200).json({ message: "Scholarship fetched successfully", data: scholarship });
   } catch (error) {
     console.error("Error fetching scholarship:", error);
     res.status(500).json({ message: "Server error" });
