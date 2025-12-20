@@ -24,6 +24,30 @@ router.get("/user/:email", verifyToken, async (req, res) => {
   }
 });
 
+// Get ALL reviews (for Moderator dashboard)
+router.get("/", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "Moderator") {
+      return res.status(403).json({
+        message: "Access denied. Moderator role required."
+      });
+    }
+
+    const db = req.app.locals.db;
+    const reviews = await db
+      .collection("reviews")
+      .find({})
+      .sort({ reviewDate: -1 })
+      .toArray();
+
+    res.json(reviews);
+  } catch (error) {
+    console.error("Error fetching all reviews:", error);
+    res.status(500).json({ message: "Failed to fetch all reviews" });
+  }
+});
+
+
 // Get all reviews for a scholarship
 router.get("/scholarship/:scholarshipId", async (req, res) => {
   try {
