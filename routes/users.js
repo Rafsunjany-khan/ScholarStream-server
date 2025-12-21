@@ -37,7 +37,8 @@ router.post("/register", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-// Login user and return JWT
+
+// login user
 router.post("/login", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -45,23 +46,24 @@ router.post("/login", async (req, res) => {
 
     const { uid, email, name, photoURL } = req.body;
 
-    if (!uid || !email) {
-      return res.status(400).json({ message: "UID and Email are required" });
-    }
+    if (!uid && !email) return res.status(400).json({ message: "UID or Email required" });
 
-    let user = await users.findOne({ uid });
+    let user = uid ? await users.findOne({ uid }) : await users.findOne({ email });
 
-    if (!user) {
-      user = {
+    if (!user && uid && name && email) {
+      const newUser = {
         uid,
         name,
         email,
-        photoURL,
+        photoURL: photoURL || "",
         role: "Student",
         createdAt: new Date(),
       };
-      await users.insertOne(user);
+      const result = await users.insertOne(newUser);
+      user = { ...newUser, _id: result.insertedId };
     }
+
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     const token = jwt.sign(
       { uid: user.uid, email: user.email, name: user.name, role: user.role },
@@ -75,7 +77,6 @@ router.post("/login", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
 
 // Get all users
 router.get("/", verifyToken, verifyAdmin, async (req, res) => {
