@@ -38,7 +38,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// login user
+// Login user
 router.post("/login", async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -48,17 +48,22 @@ router.post("/login", async (req, res) => {
 
     if (!uid && !email) return res.status(400).json({ message: "UID or Email required" });
 
-    let user = uid ? await users.findOne({ uid }) : await users.findOne({ email });
+    let user = uid ? await users.findOne({ uid }) : null;
 
-    if (!user && uid && name && email) {
+    if (!user && email) {
+      user = await users.findOne({ email });
+    }
+
+    if (!user && uid && email) {
       const newUser = {
         uid,
-        name,
+        name: name || "User",
         email,
         photoURL: photoURL || "",
         role: "Student",
         createdAt: new Date(),
       };
+
       const result = await users.insertOne(newUser);
       user = { ...newUser, _id: result.insertedId };
     }
@@ -73,7 +78,13 @@ router.post("/login", async (req, res) => {
 
     res.status(200).json({ message: "User logged in successfully", user, token });
   } catch (error) {
-    console.error(error);
+    console.error("Login error:", error);
+
+    // Handle duplicate email errors
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "User with this email already exists" });
+    }
+
     res.status(500).json({ message: "Server error" });
   }
 });
