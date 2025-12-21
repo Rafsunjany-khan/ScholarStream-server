@@ -37,18 +37,31 @@ router.post("/register", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
 // Login user and return JWT
 router.post("/login", async (req, res) => {
   try {
     const db = req.app.locals.db;
     const users = db.collection("users");
 
-    const { uid, email } = req.body;
-    if (!uid && !email) return res.status(400).json({ message: "UID or Email required" });
+    const { uid, email, name, photoURL } = req.body;
 
-    const user = uid ? await users.findOne({ uid }) : await users.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!uid || !email) {
+      return res.status(400).json({ message: "UID and Email are required" });
+    }
+
+    let user = await users.findOne({ uid });
+
+    if (!user) {
+      user = {
+        uid,
+        name,
+        email,
+        photoURL,
+        role: "Student",
+        createdAt: new Date(),
+      };
+      await users.insertOne(user);
+    }
 
     const token = jwt.sign(
       { uid: user.uid, email: user.email, name: user.name, role: user.role },
@@ -62,6 +75,7 @@ router.post("/login", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 // Get all users
 router.get("/", verifyToken, verifyAdmin, async (req, res) => {
