@@ -123,16 +123,63 @@ router.delete("/:id", verifyToken, async (req, res) => {
   }
 });
 
-// Get all scholarships
+// Get all scholarships with search, filter, sort, and pagination
 router.get("/", async (req, res) => {
   try {
     const db = req.app.locals.db;
     const scholarships = db.collection("scholarships");
-    const allScholarships = await scholarships.find({}).toArray();
+
+    const {
+      search,
+      category,
+      subject,
+      country,
+      sort,
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    let query = {};
+
+    if (search) {
+      query.$or = [
+        { scholarshipName: { $regex: search, $options: "i" } },
+        { universityName: { $regex: search, $options: "i" } },
+        { degree: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (category) query.scholarshipCategory = category;
+    if (subject) query.subjectCategory = subject;
+    if (country) query.universityCountry = country;
+
+    let sortQuery = {};
+    if (sort === "fees_asc") sortQuery.applicationFees = 1;
+    else if (sort === "fees_desc") sortQuery.applicationFees = -1;
+    else if (sort === "date_asc") sortQuery.scholarshipPostDate = 1;
+    else if (sort === "date_desc") sortQuery.scholarshipPostDate = -1;
+
+    const pageNumber = parseInt(page) || 1;
+    const limitNumber = parseInt(limit) || 10;
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const totalItems = await scholarships.countDocuments(query);
+    const results = await scholarships
+      .find(query)
+      .sort(sortQuery)
+      .skip(skip)
+      .limit(limitNumber)
+      .toArray();
 
     res.status(200).json({
-      message: "All scholarships fetched successfully",
-      data: allScholarships,
+      message: "Scholarships fetched successfully",
+      data: results,
+      pagination: {
+        totalItems,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(totalItems / limitNumber),
+      },
     });
   } catch (error) {
     console.error("Error fetching scholarships:", error);
